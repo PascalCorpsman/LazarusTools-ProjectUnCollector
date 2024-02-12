@@ -1,5 +1,7 @@
 I have a Codebase folder structure like this:
 
+![](preview.png)
+
 <Projects_folder>
   <Project_1>
   <Project_2>

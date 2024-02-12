@@ -1,26 +1,24 @@
 (******************************************************************************)
 (* uDomXML                                                         07.10.2016 *)
 (*                                                                            *)
-(* Version     : 0.07                                                         *)
+(* Version     : 0.10                                                         *)
 (*                                                                            *)
-(* Autor       : Corpsman                                                     *)
+(* Author      : Uwe Schächterle (Corpsman)                                   *)
 (*                                                                            *)
 (* Support     : www.Corpsman.de                                              *)
 (*                                                                            *)
 (* Description : Module to load / save .xml files                             *)
 (*                                                                            *)
-(* License     : This component is postcardware for non commercial use only.  *)
-(*               If you like the component, send me a postcard:               *)
+(* License     : See the file license.md, located under:                      *)
+(*  https://github.com/PascalCorpsman/Software_Licenses/blob/main/license.md  *)
+(*  for details about the license.                                            *)
 (*                                                                            *)
-(*                    Uwe Schächterle                                         *)
-(*                    Buhlstraße 85                                           *)
-(*                    71384 Weinstadt - Germany                               *)
-(*                                                                            *)
-(*               It is not allowed to change or remove this license from any  *)
+(*               It is not allowed to change or remove this text from any     *)
 (*               source file of the project.                                  *)
 (*                                                                            *)
-(*                                                                            *)
-(* Warranty    : There is no warranty, use at your own risk.                  *)
+(* Warranty    : There is no warranty, neither in correctness of the          *)
+(*               implementation, nor anything other that could happen         *)
+(*               or go wrong, use at your own risk.                           *)
 (*                                                                            *)
 (* History     : 0.01 - Initial version                                       *)
 (*               0.02 - Fix Memleak on error, Fix Stringparsing               *)
@@ -32,6 +30,9 @@
 (*                      Parsing state -> enum                                 *)
 (*               0.06 - Findpath (wie bei TJSONObj) implementiert             *)
 (*               0.07 - ExpandEmptyNodes                                      *)
+(*               0.08 - Erste implementierung zu "escaping"                   *)
+(*               0.09 - generisches AddChild für TDomnode                     *)
+(*               0.10 - FIX scan for invalid characters in Attributes         *)
 (*                                                                            *)
 (* Known Bugs  : -Unsinnige Fehlermeldung wenn gar keine gültige xml Datei    *)
 (*                geparst werden soll.                                        *)
@@ -92,13 +93,14 @@ Type
     (*
      * Routinen zum Händischen Erstellen aus dem "nichts"
      *)
-    Function AddChild(ChildNodeName, ChildNodeValue: String): TDomNode; // Erstellt einen neuen Kindknoten und gibt diesen zurück
+    Function AddChild(ChildNodeName, ChildNodeValue: String): TDomNode; overload; // Erstellt einen neuen Kindknoten und gibt diesen zurück
+    Function AddChild(Const NewChild: TDomNode): TDomNode; overload; // Damit kann dann ein beliebiges DomNode z.B. TDeclaraionDomNode, TCommentDomNode eingefügt werden.
     Procedure AddAttribute(aAttributeName, aAttributeValue: String);
     Procedure DelAttribute(index: integer);
   End;
 
-  TCommentDomNode = Class(TDomNode);
-  TProcessingInstructionDomNode = Class(TDomNode);
+  TCommentDomNode = Class(TDomNode); // <!
+  TDeclaraionDomNode = Class(TDomNode); // <?
 
   { TDOMXML }
 
@@ -138,6 +140,62 @@ Type
 Implementation
 
 Uses SysUtils, LazFileUtils;
+
+(*
+ * Konvertiert einen String in einen String der in einer XML-Datei stehen darf
+ * > -> &#60 , ...
+ *)
+
+Function StringToXMLString(Value: String): String;
+Begin
+  result := value;
+  result := StringReplace(result, '&', '&#38;', [rfReplaceAll]);
+  result := StringReplace(result, '<', '&#60;', [rfReplaceAll]);
+  result := StringReplace(result, '>', '&#62;', [rfReplaceAll]);
+  result := StringReplace(result, '''', '&#39;', [rfReplaceAll]);
+  result := StringReplace(result, '"', '&#34;', [rfReplaceAll]);
+End;
+
+(*
+ * Umkehrfunktion zu StringToXMLString
+ *)
+
+Function XMLStringToString(Value: String): String;
+Begin
+  result := value;
+  result := StringReplace(result, '&#34;', '"', [rfReplaceAll]);
+  result := StringReplace(result, '&#39;', '''', [rfReplaceAll]);
+  result := StringReplace(result, '&gt;', '>', [rfReplaceAll]);
+  result := StringReplace(result, '&#62;', '>', [rfReplaceAll]);
+  result := StringReplace(result, '&lt;', '<', [rfReplaceAll]);
+  result := StringReplace(result, '&#60;', '<', [rfReplaceAll]);
+  result := StringReplace(result, '&#38;', '&', [rfReplaceAll]);
+End;
+
+(*
+ * Konvertiert einen String in einen String der in einem XML-Attribut stehen darf
+ * & -> &amp; , ...
+ *)
+
+Function StringToXMLAttributeString(Value: String): String;
+Begin
+  result := value;
+  result := StringReplace(result, '&', '&amp;', [rfReplaceAll]);
+  result := StringReplace(result, '<', '&lt;', [rfReplaceAll]);
+  result := StringReplace(result, '"', '&quot;', [rfReplaceAll]);
+End;
+
+(*
+ * Umkehrfunktion zu StringToXMLAttributeString
+ *)
+
+Function XMLAttributeStringToString(Value: String): String;
+Begin
+  result := value;
+  result := StringReplace(result, '&quot;', '"', [rfReplaceAll, rfIgnoreCase]);
+  result := StringReplace(result, '&lt;', '<', [rfReplaceAll, rfIgnoreCase]);
+  result := StringReplace(result, '&amp;', '&', [rfReplaceAll, rfIgnoreCase]);
+End;
 
 { TDOMXML }
 
@@ -320,7 +378,7 @@ Begin
       SearchSPGT: Begin // Lesen Attribute
           If (ord(Buffer[Index]) <= 32) Or (Buffer[Index] = '>') Or (Buffer[Index] = '/') Then Begin
             If isProcessingNode Then Begin
-              result := TProcessingInstructionDomNode.Create;
+              result := TDeclaraionDomNode.Create;
             End
             Else Begin
               result := TDomNode.Create;
@@ -380,7 +438,7 @@ Begin
           If (Not inString) And ((ord(Buffer[Index]) <= 32) Or (Buffer[Index] = '>') Or (Buffer[Index] = '/') Or (isProcessingNode And (Buffer[Index] = '?'))) Then Begin
             setlength(result.fAttributes, High(result.fAttributes) + 2);
             result.fAttributes[High(result.fAttributes)].AttributeName := an;
-            result.fAttributes[High(result.fAttributes)].AttributeValue := StringReplace(t, '&quot;', '"', [rfReplaceAll, rfIgnoreCase]);
+            result.fAttributes[High(result.fAttributes)].AttributeValue := XMLAttributeStringToString(t);
             t := '';
             If (ord(Buffer[Index]) <= 32) Then Begin // Es folgt ein weiteres Attribut
               state := ReadNameAttr;
@@ -430,7 +488,7 @@ Begin
               oindex := Index;
             End;
           Until tmpNode = Nil;
-          result.NodeValue := trim(copy(Buffer, oindex, Index - oindex + 1));
+          result.NodeValue := XMLStringToString(trim(copy(Buffer, oindex, Index - oindex + 1)));
           state := SearchLTSlash;
         End;
       ReadCommend: Begin
@@ -500,14 +558,14 @@ Begin
     End;
   End;
   // Schreiben aller Attribute und des Namens
-  If Node Is TProcessingInstructionDomNode Then Begin
+  If Node Is TDeclaraionDomNode Then Begin
     s := '<?' + Node.NodeName;
   End
   Else Begin
     s := '<' + Node.NodeName;
   End;
   For i := 0 To High(Node.fAttributes) Do Begin
-    s := s + ' ' + Node.fAttributes[i].AttributeName + '="' + StringReplace(Node.fAttributes[i].AttributeValue, '"', '&quot;', [rfReplaceAll, rfIgnoreCase]) + '"';
+    s := s + ' ' + Node.fAttributes[i].AttributeName + '="' + StringToXMLAttributeString(Node.fAttributes[i].AttributeValue) + '"';
   End;
   // Ein Node mit nur Attributen
   If (High(Node.fNodes) = -1) And (trim(Node.NodeValue) = '') Then Begin
@@ -518,7 +576,7 @@ Begin
       List.Add(dp + s);
     End
     Else Begin
-      If Node Is TProcessingInstructionDomNode Then Begin
+      If Node Is TDeclaraionDomNode Then Begin
         s := s + '?>';
       End
       Else Begin
@@ -531,7 +589,7 @@ Begin
   s := s + '>';
   // Ein Node ohne Kind Nodes
   If (High(Node.fNodes) = -1) Then Begin
-    s := s + Node.NodeValue;
+    s := s + StringToXMLString(Node.NodeValue);
     s := s + '</' + Node.NodeName + '>';
     List.Add(dp + s);
   End
@@ -542,7 +600,7 @@ Begin
       SaveNode(Node.fNodes[i], List, Depth + 1);
     End;
     If trim(Node.NodeValue) <> '' Then Begin // in der Regel sollte NodeValue = '' sein, aber man weis ja nie, erlaubt wäre es..
-      List.Add(dp + Node.NodeValue);
+      List.Add(dp + StringToXMLString(Node.NodeValue));
     End;
     s := '</' + Node.NodeName + '>';
     List.Add(dp + s);
@@ -673,7 +731,7 @@ Begin
   fAktualTraverser := -1;
   For i := 0 To High(fNodes) Do Begin
     If (Not (fNodes[i] Is TCommentDomNode)) And
-      (Not (fNodes[i] Is TProcessingInstructionDomNode)) Then Begin
+      (Not (fNodes[i] Is TDeclaraionDomNode)) Then Begin
       result := fNodes[i];
       fAktualTraverser := i;
       exit;
@@ -691,7 +749,7 @@ Begin
   End;
   For i := fAktualTraverser + 1 To High(fNodes) Do Begin
     If (Not (fNodes[i] Is TCommentDomNode)) And
-      (Not (fNodes[i] Is TProcessingInstructionDomNode)) Then Begin
+      (Not (fNodes[i] Is TDeclaraionDomNode)) Then Begin
       result := fNodes[i];
       fAktualTraverser := i;
       exit;
@@ -784,6 +842,14 @@ Begin
   result.NodeValue := ChildNodeValue;
 End;
 
+Function TDomNode.AddChild(Const NewChild: TDomNode): TDomNode;
+Begin
+  setlength(fNodes, high(fNodes) + 2);
+  fNodes[high(fNodes)] := NewChild;
+  fNodes[high(fNodes)].fParent := self;
+  result := fNodes[high(fNodes)];
+End;
+
 Procedure TDomNode.AddAttribute(aAttributeName, aAttributeValue: String);
 Begin
   // Todo: Prüfen ob es das schon gibt..
@@ -803,4 +869,5 @@ Begin
 End;
 
 End.
+
 
