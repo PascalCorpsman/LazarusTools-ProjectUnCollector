@@ -31,7 +31,6 @@ object Form1: TForm1
     Anchors = [akTop, akLeft, akRight, akBottom]
     ItemHeight = 0
     TabOrder = 1
-    TopIndex = -1
   end
   object Button2: TButton
     Left = 16
@@ -55,31 +54,31 @@ object Form1: TForm1
   end
   object Label1: TLabel
     Left = 16
-    Height = 16
+    Height = 15
     Top = 80
-    Width = 87
+    Width = 77
     Caption = 'Actual project:'
   end
   object Label2: TLabel
     Left = 136
-    Height = 16
+    Height = 15
     Top = 80
-    Width = 41
+    Width = 34
     Caption = 'Label2'
   end
   object Label3: TLabel
     Left = 16
-    Height = 16
+    Height = 15
     Top = 48
-    Width = 146
+    Width = 127
     Caption = 'Recently used *.lpi files :'
   end
   object ComboBox1: TComboBox
     Left = 184
-    Height = 27
+    Height = 23
     Top = 40
     Width = 320
-    ItemHeight = 0
+    ItemHeight = 15
     OnChange = ComboBox1Change
     OnKeyPress = ComboBox1KeyPress
     ParentShowHint = False

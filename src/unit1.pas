@@ -1,3 +1,31 @@
+(******************************************************************************)
+(* ProjectUnCollector                                              ??.??.???? *)
+(*                                                                            *)
+(* Version     : 0.02                                                         *)
+(*                                                                            *)
+(* Author      : Uwe Schächterle (Corpsman)                                   *)
+(*                                                                            *)
+(* Support     : www.Corpsman.de                                              *)
+(*                                                                            *)
+(* Description : <Module_description>                                         *)
+(*                                                                            *)
+(* License     : See the file license.md, located under:                      *)
+(*  https://github.com/PascalCorpsman/Software_Licenses/blob/main/license.md  *)
+(*  for details about the license.                                            *)
+(*                                                                            *)
+(*               It is not allowed to change or remove this text from any     *)
+(*               source file of the project.                                  *)
+(*                                                                            *)
+(* Warranty    : There is no warranty, neither in correctness of the          *)
+(*               implementation, nor anything other that could happen         *)
+(*               or go wrong, use at your own risk.                           *)
+(*                                                                            *)
+(* Known Issues: none                                                         *)
+(*                                                                            *)
+(* History     : 0.01 - Initial version                                       *)
+(*               0.02 - Umstellen auf uDomXML                                 *)
+(*                                                                            *)
+(******************************************************************************)
 Unit Unit1;
 
 {$MODE objfpc}{$H+}
@@ -151,10 +179,6 @@ Begin
   End;
   Constraints.MinWidth := Width;
   Constraints.MinHeight := Height;
-  (*
-   * Historie : 0.01 = Initialversion
-   *            0.02 = Umstellen auf uDomXML
-   *)
   caption := 'Project Uncollector ver. 0.02 by Corpsman, Support : www.Corpsman.de';
   SelectDirectoryDialog1.InitialDir := ExtractFileDir(paramstr(0));
   OpenDialog1.InitialDir := ExtractFileDir(paramstr(0));
@@ -233,7 +257,7 @@ Begin
       End;
     End;
     If (infile = '') Then Begin
-      showmessage('Error either input file or output dir is not set.' + LineEnding +
+      showmessage('Error input file is not set.' + LineEnding +
         'Usage "-i project1.lpi');
       halt;
     End;
